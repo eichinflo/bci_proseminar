@@ -2,7 +2,7 @@
 All the material used in paper + presentation "Preprocessing and Classification of ERD/ERS Signals".
 
 Presentation will be held in July at Albert Ludwigs University Freiburg. 
-See http://www.bsdlab.uni-freiburg.de/teaching/sose18/seminar-proseminar-doing-by-thinking for details on Seminar format.
+See http://www.bsdlab.uni-freiburg.de/teaching/sose18/seminar-proseminar-doing-by-thinking for further details on the seminar.
 
 An introduction to CSPs can be found in [2], starting good point for exploring BCIs is [1].
 
