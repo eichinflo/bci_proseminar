@@ -1,4 +1,4 @@
-Optimizing# Proseminar "Doing by Thinking"
+# Proseminar "Doing by Thinking"
 All the material used in paper + presentation "Preprocessing and Classification of ERD/ERS Signals".
 
 Presentation will be held in July at Albert Ludwigs University Freiburg. 
