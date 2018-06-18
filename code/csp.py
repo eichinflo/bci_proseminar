@@ -1,21 +1,21 @@
 """
 CSP and workarounds for plotting data with NME-library. This code was
 written to provide an easy way to plot the stuff I needed for my
-presentation and paper "Preprocessing and Classification of ERD/ERS 
+presentation and paper "Preprocessing and Classification of ERD/ERS
 Signals".
 
-- Parts of the dataset mne.datasets.eegbci were used, 
+- Parts of the dataset mne.datasets.eegbci were used,
 description and discussion of the whole set can be found in:
 
-Schalk, G McFarland, DJ Hinterberger T, Birbaumer N, Wolpaw JR, 
-BCI2000: A General-Purpose Brain-Computer Interface (BCI) System. 
+Schalk, G McFarland, DJ Hinterberger T, Birbaumer N, Wolpaw JR,
+BCI2000: A General-Purpose Brain-Computer Interface (BCI) System.
 IEEE TBME 51(6):1034-1043, 2004
 
 
 - A good introduction to CSP:
 
-Blankertz B, Tomioka R, Lemm S, Kawanabe M, Müller KR, 
-Optimizing Spatial Filters for Robust EEG Single-Trial Analysis. 
+Blankertz B, Tomioka R, Lemm S, Kawanabe M, Müller KR,
+Optimizing Spatial Filters for Robust EEG Single-Trial Analysis.
 IEEE Signal Process Mag, 25(1):41-56, 2008
 
 
@@ -24,6 +24,7 @@ Authors:
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 import mne
 from scipy.linalg import eigh, inv
 import sys
@@ -78,7 +79,6 @@ def make_samples(events, data, classes, sample_rate=160):
         cls_to_epoch[cls] = []
 
     cont_signal = data.get_data()
-    print(cont_signal.shape)
     # for every event, add according epoch
     for event in events:
         if event[2] in cls_to_epoch.keys():
@@ -120,6 +120,76 @@ def get_data(hp=0, lp=40):
     data.filter(hp, lp)
 
     return data
+
+
+def get_projections(filters, a, b, descr, channel_names, d=1):
+    """
+    Return projections defined in rows a to b of filters.
+
+    Args:
+        a, b (int) - index boundaries of the slice of filters
+
+        filters (np.matrix) - 2-dim filter matrix
+    """
+    projs = []
+    if d == -1:
+        # go backwards
+        a, b = b, a
+    for j in range(a, b, d):
+        proj = make_projection(filters[j, :], channel_names,
+                               descr + str(abs(j) + 1))
+        projs.append(proj)
+    return projs
+
+
+def make_variance_plt():
+    """
+    A function for making the example variance plot for explaining CSP.
+    Nothing to be seen here.
+    """
+    # covariance matrices for the toy data
+    cov1 = [[1.5, 0.6], [0.6, 0.4]]
+    cov2 = [[0.4, 0.6], [0.6, 1.5]]
+
+    # get mean-free distributions
+    X1 = np.random.multivariate_normal([0, 0], cov1, 400)
+    X2 = np.random.multivariate_normal([0, 0], cov2, 400)
+
+    plt.scatter(X1[:, 0], X1[:, 1], c="green", marker=".", alpha=0.7)
+    plt.scatter(X2[:, 0], X2[:, 1], c="blue", marker=".", alpha=0.7)
+    plt.show()
+
+    # apply CSP-filters to data
+    W = calc_filters(np.matrix(cov1), np.matrix(cov2))
+
+    X1 = X1.dot(W).getA()
+    X2 = X2.dot(W).getA()
+
+    plt.scatter(X1[:, 0], X1[:, 1], c="green", marker=".", alpha=0.7)
+    plt.scatter(X2[:, 0], X2[:, 1], c="blue", marker=".", alpha=0.7)
+    plt.show()
+
+
+def get_data_for_class(data, cls):
+    """
+    Returns raw object with only concatenated epochs of type cls.
+    """
+    events = data.find_edf_events()
+
+    cls_events = [event for event in events if event[2] == cls]
+    print(cls_events)
+
+    new_data = data.copy().crop(
+        tmin=cls_events[0][0],
+        tmax=cls_events[0][0] + cls_events[0][1])
+
+    for i in range(1, len(cls_events)):
+        next_epoch = data.copy().crop(
+            tmin=cls_events[i][0],
+            tmax=cls_events[i][0] + cls_events[i][1])
+        new_data.append(next_epoch)
+
+    return new_data
 
 
 # ########################### CSP #############################
@@ -187,7 +257,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print()
         print("=" * 50)
-        print("USAGE: python3 csp.py -[MODES] [CHANNEL_NO (Opt)]")
+        print("USAGE: python3 csp.py -[MODES] [CHANNEL_NOS (Opt)]")
         print()
         print("> MODES:")
         print(">   p : plot EEG-data")
@@ -196,7 +266,7 @@ if __name__ == "__main__":
         print(">   b : use backward model, default")
         print(">   f : use forward model")
         print()
-        print("Try 'python3 csp.py -tf' or 'python3 csp.py -s 15'")
+        print("Try 'python3 csp.py -tf' or 'python3 csp.py -s 15 17'")
         print("=" * 50)
         print()
         sys.exit(1)
@@ -207,7 +277,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         ch_no = int(sys.argv[2])
 
-    data = get_data()
+    data = get_data(hp=5, lp=30)
 
     W = apply_csp(data)  # backward model
     A = inv(W)  # forward model
@@ -235,22 +305,28 @@ if __name__ == "__main__":
         # default is backward model
         filters = W
 
-    # use first and last ten projections
-    projs = []
-    for j in range(0, 10):
-        proj0 = make_projection(filters[j, :], channel_names,
-                                "CSP_forward(%d)" % j)
-        proj1 = make_projection(filters[-1 - j, :], channel_names,
-                                "CSP_forward(%d)" % -j)
-        projs.append(proj0)
-        projs.append(proj1)
+    # use first ten projections
+    projs = get_projections(filters, 0, 10, "w_",
+                            channel_names=channel_names)
+
+    # projs += get_projections(filters, 60, 63, "w_",
+    #                        channel_names=channel_names, d=-1)
 
     data.add_proj(projs)
+
+    # make continuous data of event related parts
+    t1_data = get_data_for_class(data, "T1")
+    t2_data = get_data_for_class(data, "T2")
+    t1_data.add_proj(projs)
+    t2_data.add_proj(projs)
+    plots = []
+
     # choose channel for spectral analysis
     if ch_no:
         interesting = [ch_no]
     else:
-        interesting = [15]
+        interesting = [15, 8, 7, 14]
+        baseline = [23]
 
     # plot the stuff that was asked for in modes
     if 't' in modes:
@@ -258,9 +334,42 @@ if __name__ == "__main__":
     if 'p' in modes:
         data.plot(block=True)
     if 's' in modes:
-        data.plot_psd(proj=False, picks=interesting, n_overlap=100)
+        no = 128
+        nf = 256
+        t1_data.plot_psd(proj=False,
+                         picks=interesting,
+                         color="blue",
+                         n_overlap=no,
+                         n_fft=nf,
+                         spatial_colors=False,
+                         estimate="amplitude")
+        t2_data.plot_psd(proj=False,
+                         picks=interesting,
+                         n_overlap=no,
+                         n_fft=nf,
+                         spatial_colors=False,
+                         color="red",
+                         estimate="amplitude")
+
+    # apply projections to data
     data.apply_proj()
+    t1_data.apply_proj()
+    t2_data.apply_proj()
+
     if 'p' in modes:
         data.plot(block=True)
     if 's' in modes:
-        data.plot_psd(picks=interesting, n_overlap=100)
+        t1_data.plot_psd(picks=interesting,
+                         n_overlap=no,
+                         n_fft=nf,
+                         spatial_colors=False,
+                         color="blue",
+                         estimate="amplitude")
+        t2_data.plot_psd(picks=interesting,
+                         n_overlap=no,
+                         n_fft=nf,
+                         spatial_colors=False,
+                         color="red",
+                         estimate="amplitude")
+    if 'c' in modes:
+        make_variance_plt()
