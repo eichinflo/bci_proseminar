@@ -277,7 +277,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         ch_no = int(sys.argv[2])
 
-    data = get_data(hp=5, lp=30)
+    data = get_data(hp=2, lp=60)
 
     W = apply_csp(data)  # backward model
     A = inv(W)  # forward model
@@ -305,6 +305,8 @@ if __name__ == "__main__":
         # default is backward model
         filters = W
 
+    
+
     # use first ten projections
     projs = get_projections(filters, 0, 10, "w_",
                             channel_names=channel_names)
@@ -312,8 +314,18 @@ if __name__ == "__main__":
     # projs += get_projections(filters, 60, 63, "w_",
     #                        channel_names=channel_names, d=-1)
 
-    data.add_proj(projs)
+    #data.add_proj(projs)
 
+    data.plot_psd(proj=False,
+                  picks=[i for i in range(4, 40)],
+                  n_overlap=260,
+                  n_fft=300,
+                  spatial_colors=False,
+                  color="blue",
+                  average=True,
+                  area_mode=None)
+
+    
     # make continuous data of event related parts
     t1_data = get_data_for_class(data, "T1")
     t2_data = get_data_for_class(data, "T2")
@@ -325,7 +337,7 @@ if __name__ == "__main__":
     if ch_no:
         interesting = [ch_no]
     else:
-        interesting = [15, 8, 7, 14]
+        interesting = [8]
         baseline = [23]
 
     # plot the stuff that was asked for in modes
@@ -334,22 +346,27 @@ if __name__ == "__main__":
     if 'p' in modes:
         data.plot(block=True)
     if 's' in modes:
-        no = 128
-        nf = 256
+        no = 70
+        nf = 80
+        avrg = True
+        est = "power"
         t1_data.plot_psd(proj=False,
                          picks=interesting,
                          color="blue",
                          n_overlap=no,
                          n_fft=nf,
                          spatial_colors=False,
-                         estimate="amplitude")
+                         estimate=est,
+                         average=avrg,
+                         line_alpha=10.0)
         t2_data.plot_psd(proj=False,
                          picks=interesting,
                          n_overlap=no,
                          n_fft=nf,
                          spatial_colors=False,
                          color="red",
-                         estimate="amplitude")
+                         estimate=est,
+                         average=avrg)
 
     # apply projections to data
     data.apply_proj()
@@ -364,12 +381,14 @@ if __name__ == "__main__":
                          n_fft=nf,
                          spatial_colors=False,
                          color="blue",
-                         estimate="amplitude")
+                         estimate=est,
+                         average=avrg)
         t2_data.plot_psd(picks=interesting,
                          n_overlap=no,
                          n_fft=nf,
                          spatial_colors=False,
                          color="red",
-                         estimate="amplitude")
+                         estimate=est,
+                         average=avrg)
     if 'c' in modes:
         make_variance_plt()
